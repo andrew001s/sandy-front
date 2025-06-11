@@ -1,14 +1,61 @@
 "use client";
-import React, { useState } from "react";
 import { Card, CardContent } from "../ui/card";
 import Image from "next/image";
 import { Button } from "../ui/button";
 import { ClipLoader } from "react-spinners";
 import { BsMoonStarsFill } from "react-icons/bs";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { useStatus } from "@/context/StatusContext";
+import { useTwitchAuth } from "@/hooks/useTwitchAuth";
+import { useEffect } from "react";
+import { getTokens, postAuth } from "@/api/fetchAuth";
+import { start } from "@/api/sandycore";
+import { toast } from "sonner";
 
 export const CardConnectionBot = () => {
-  const [isloading, setIsLoading] = useState(false);
+  const { status: globalStatus } = useStatus();
+  const {
+		isLoading,
+		setIsLoading,
+		profile,
+		status,
+		handleStart,
+		handleClose,
+		fetchProfile,
+		setStatus,
+	} = useTwitchAuth(true);
+
+  useEffect(() => {
+		if (status && !profile) {
+			fetchProfile();
+		}
+	}, [status, profile, fetchProfile]);
+
+  const handleStartConnection = async () => {
+		const tokens = await getTokens(true);
+		if (!tokens.tokens || !tokens.tokens.token || !tokens.tokens.refresh_token) {
+			handleStart(true);
+		} else {
+			try {
+				setIsLoading(true);
+				await postAuth({
+					token: tokens.tokens.token,
+					refresh_token: tokens.tokens.refresh_token,
+					bot: true,
+				});
+				await start(true);
+				setStatus(true);
+				await fetchProfile();
+				toast.success('Conectado a Twitch');
+			} catch (error) {
+				console.error('Error al reconectar:', error);
+				toast.error('Error al reconectar, iniciando nuevo proceso de autenticación');
+				handleStart(false);
+			} finally {
+				setIsLoading(false);
+			}
+		}
+	};
 
   return (
     <Card
@@ -18,7 +65,7 @@ export const CardConnectionBot = () => {
       <CardContent className="flex flex-col space-y-4 p-4 sm:flex-row sm:items-center sm:space-x-4">
         <div className="flex flex-row items-center space-x-4 sm:justify-center">
           <Avatar className="ml-4 h-28 w-28 border-2 border-foreground">
-            <AvatarImage src={""} />
+            <AvatarImage src={profile?.picProfile} />
             <AvatarFallback>
               {/* biome-ignore lint/nursery/noImgElement: React Vite */}
               <Image
@@ -32,21 +79,24 @@ export const CardConnectionBot = () => {
             </AvatarFallback>
           </Avatar>
           <span className="truncate font-bold text-2xl text-foreground">
-            test
+            {profile?.username}
           </span>
         </div>
 
         <div className="flex w-full flex-col justify-center">
-          {true ? (
-            <Button className="mx-auto h-16 w-full cursor-pointer bg-chart-1 font-normal text-foreground text-xl hover:bg-chart-1">
+          {status ? (
+            <Button 
+              onClick={handleClose}
+              className="mx-auto h-16 w-full cursor-pointer bg-chart-1 font-normal text-foreground text-xl hover:bg-chart-1">
               <span>Desconectar</span>
             </Button>
           ) : (
             <Button
+              onClick={handleStartConnection}
               className="mx-auto h-16 w-xs cursor-pointer bg-chart-1 font-normal text-foreground text-xl hover:bg-chart-1"
-              disabled={isloading}
+              disabled={isLoading || !globalStatus}
             >
-              {isloading ? (
+              {isLoading ? (
                 <div className="flex flex-row items-center justify-center space-x-3">
                   <span className="pl-2">Conectando</span>
                   <ClipLoader
@@ -62,7 +112,7 @@ export const CardConnectionBot = () => {
           )}
           <span className="pt-2 text-xl">
             Estado:{" "}
-            {true ? (
+            {status ? (
               <span className="text-chart-2">Conectado</span>
             ) : (
               <span className="text-chart-5">Desconectado</span>
