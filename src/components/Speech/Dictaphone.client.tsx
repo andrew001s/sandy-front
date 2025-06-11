@@ -18,15 +18,20 @@ const Dictaphone = () => {
 	const [transcriptHistory, setTranscriptHistory] = useState<string[]>([]);
 	const { audioRef, addToQueue } = useAudioQueue();
 	const [silenceTimer, setSilenceTimer] = useState<NodeJS.Timeout | null>(null);
+	useEffect(() => {
+		const initSpeechRecognition = () => {
+			const { SpeechRecognition: AzureSpeechRecognition } = createSpeechServicesPonyfill({
+				credentials: {
+					region: REGION,
+					subscriptionKey: SUBSCRIPTION_KEY,
+				},
+			});
+			
+			SpeechRecognition.applyPolyfill(AzureSpeechRecognition);
+		};
 
-	const { SpeechRecognition: AzureSpeechRecognition } = createSpeechServicesPonyfill({
-		credentials: {
-			region: REGION,
-			subscriptionKey: SUBSCRIPTION_KEY,
-		},
-	});
-
-	SpeechRecognition.applyPolyfill(AzureSpeechRecognition);
+		initSpeechRecognition();
+	}, []); // Solo se ejecuta una vez al montar el componente
 
 	const { transcript, resetTranscript, browserSupportsSpeechRecognition } = useSpeechRecognition({
 		commands: [
